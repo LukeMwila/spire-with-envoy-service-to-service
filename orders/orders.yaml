@@ -1,0 +1,83 @@
+---
+# Source: orders/charts/orders/templates/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: orders-service-account 
+  namespace: ecommerce
+---
+# Source: orders/charts/orders/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-service
+  namespace: ecommerce
+spec:
+  selector:
+    app: orders
+  type: ClusterIP
+  ports:
+  - protocol: TCP
+    name: orders-proxy-listener
+    port: 8003
+    targetPort: 8003
+---
+# Source: orders/charts/orders/templates/new-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders
+  namespace: ecommerce
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orders
+      workload: ecommerce
+  template:
+    metadata:
+      labels:
+        app: orders
+        workload: ecommerce
+    spec:
+      serviceAccountName: orders-service-account
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: "topology.kubernetes.io/zone"
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: orders
+      nodeSelector:
+        managedBy: karpenter
+      containers:
+        - name: envoy
+          image: envoyproxy/envoy:v1.25.7
+          imagePullPolicy: Always
+          args: ["-l", "debug", "--local-address-ip-version", "v4", "-c", "/run/envoy/envoy.yaml", "--base-id", "2"]
+          ports:
+          - containerPort: 8003
+          - containerPort: 8004
+          volumeMounts:
+          - name: envoy-config
+            mountPath: "/run/envoy"
+            readOnly: true 
+          - name: spire-agent-socket
+            mountPath: /run/spire/sockets
+            readOnly: true
+        - name: orders-container
+          image: "lukondefmwila/ecommerce-orders:0.3.4"
+          ports:
+          - containerPort: 3003
+          resources:
+            requests:
+              cpu: "1"
+              memory: "64Mi"
+      volumes:
+      - name: envoy-config
+        configMap:
+          name: orders-envoy-config
+      - name: spire-agent-socket
+        hostPath:
+          path: /run/spire/sockets
+          type: DirectoryOrCreate

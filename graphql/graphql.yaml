@@ -1,0 +1,78 @@
+---
+# Source: graphql/charts/graphql/templates/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: graphql-service-account 
+  namespace: ecommerce
+---
+# Source: graphql/charts/graphql/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: graphql-service
+  namespace: ecommerce
+spec:
+  selector:
+    app: graphql
+  type: ClusterIP
+  ports:
+  - protocol: TCP
+    port: 8002
+    targetPort: 8002
+---
+# Source: graphql/charts/graphql/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: graphql
+  namespace: ecommerce
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: graphql
+      role: api
+      workload: ecommerce
+  template:
+    metadata:
+      labels:
+        app: graphql
+        role: api
+        workload: ecommerce
+    spec:
+      serviceAccountName: graphql-service-account
+      nodeSelector:
+        managedBy: karpenter
+      containers:
+      - name: envoy
+        image: envoyproxy/envoy:v1.25.7
+        imagePullPolicy: Always
+        args: ["-l", "debug", "--local-address-ip-version", "v4", "-c", "/run/envoy/envoy.yaml", "--base-id", "2"]
+        ports:
+        - containerPort: 8002
+        - containerPort: 8003
+        - containerPort: 8004
+        volumeMounts:
+        - name: envoy-config
+          mountPath: "/run/envoy"
+          readOnly: true 
+        - name: spire-agent-socket
+          mountPath: /run/spire/sockets
+          readOnly: true 
+      - name: graphql-container
+        image: "lukondefmwila/ecommerce-graphql:0.1.7"
+        ports:
+        - containerPort: 3002
+        resources:
+          requests:
+            cpu: "1"
+            memory: "64Mi"
+      volumes:
+      - name: envoy-config
+        configMap:
+          name: graphql-envoy-config
+      - name: spire-agent-socket
+        hostPath:
+          path: /run/spire/sockets
+          type: DirectoryOrCreate
