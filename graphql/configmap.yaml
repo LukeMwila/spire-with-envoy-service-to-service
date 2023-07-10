@@ -53,6 +53,24 @@ data:
                       grpc_services:
                         envoy_grpc:
                           cluster_name: spire_agent
+                combined_validation_context:
+                  # validate the SPIFFE ID of incoming clients (optionally)
+                  default_validation_context:
+                    match_typed_subject_alt_names:
+                    - san_type: URI
+                      matcher:
+                        exact: "spiffe://outlier.org/ns/ecommerce/sa/edge-proxy-service-account"
+                  # obtain the trust bundle from SDS
+                  validation_context_sds_secret_config:
+                    name: "spiffe://outlier.org"
+                    sds_config:
+                      resource_api_version: V3
+                      api_config_source:
+                        api_type: GRPC
+                        transport_api_version: V3
+                        grpc_services:
+                          envoy_grpc:
+                            cluster_name: spire_agent
                 tls_params:
                   ecdh_curves:
                     - X25519:P-256:P-521:P-384
