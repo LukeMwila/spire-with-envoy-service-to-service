@@ -6,4 +6,4 @@ This respository contains the source code for an example of how to use SPIRE wit
 
 ## Prerequisites
 * Kubernetes Cluster
-* SPIRE Deployment
+* [SPIRE Deployment](https://spiffe.io/docs/latest/try/getting-started-k8s/)
